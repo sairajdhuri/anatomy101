@@ -284,11 +284,8 @@ export default function AtlasStudio() {
       <div className="dialog-header"><span className="section-label">ABOUT THIS ATLAS</span><button className="icon-button" onClick={() => setAbout(false)} aria-label="Close atlas information"><X size={20}/></button></div>
       <h2>Human anatomy, made explorable.</h2><p>Explore anatomical structures, review system relationships, and practice identification.</p>
       <div className="source-stats"><span><strong>{atlas?.parts.length.toLocaleString() || '2,234'}</strong>individual meshes</span><span><strong>{atlas?.concepts.length.toLocaleString() || '3,432'}</strong>named concepts</span></div>
-      <h3>BodyParts3D · adult male reference</h3><p>BodyParts3D, © The Database Center for Life Science. Licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>. The model is simplified for the browser and does not represent every structure or anatomical variation.</p>
       <h3>Study content</h3><p>Organ notes are brief educational summaries with linked references. Structures without authored notes show system context. This app is for learning and revision, not diagnosis or surgical planning.</p>
       <p className="muted">Geometry: {remote ? 'online model files' : 'local model files'}. Bookmarks and notes stay in this browser.</p>
-      <a className="reference-link" href="/ATTRIBUTION.md" target="_blank" rel="noreferrer">Full model attribution<ArrowUpRight size={15}/></a>
-      <a className="reference-link" href="/LICENSE" target="_blank" rel="noreferrer">Software license<ArrowUpRight size={15}/></a>
       <a className="reference-link" href="https://dbarchive.biosciencedbc.jp/en/bodyparts3d/download.html" target="_blank" rel="noreferrer">Original anatomy dataset<ArrowUpRight size={15}/></a>
     </dialog>
   </main>;
