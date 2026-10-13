@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Activity, ArrowRight, ArrowUpRight, Bookmark, BookOpen, Check, ChevronRight, CircleHelp,
+import { ArrowRight, ArrowUpRight, Bookmark, BookOpen, Check, ChevronRight, CircleHelp,
   Eye, EyeOff, Focus, Layers3, Maximize2, Menu, Pause, RotateCcw, RotateCw, Search, X } from 'lucide-react';
 import { DEFAULT_VISIBLE, SYSTEMS, explanation, type Atlas, type Concept, type SceneState,
   type SystemId, type View } from '@/atlas/anatomy';
@@ -165,7 +165,7 @@ export default function AtlasStudio() {
     </header>
     <section className="landing-hero" id="top">
       <div className="hero-copy"><h1><span><i>Explore</i></span><span><i>anatomy</i></span></h1><p className="hero-deck">A detailed 3D atlas for medical study. Explore systems, separate structures, and build recall through hands-on revision.</p><div className="hero-actions"><button className="landing-primary" onClick={() => openAtlas()}>Start exploring <ArrowRight size={17}/></button><a className="landing-secondary" href="#systems">Browse systems</a></div><p className="hero-note">Rotate · isolate · inspect · revise</p></div>
-      <div className="hero-plates"><img className="hero-poster" src="/Anatomy101.jpg" alt="Anatomy101 anatomical plate with labelled brain, hand, and body illustrations"/></div>
+      <div className="hero-plates"><div className="hero-artwork"><img className="hero-poster" src="/hero.png" alt="The Human Body, Anatomy101: engraved anatomical illustrations of the brain, torso, hand, and rib cage"/></div><button className="landing-primary hero-art-cta" onClick={() => openAtlas()}>Start exploring <ArrowRight size={17}/></button></div>
     </section>
     <section className="landing-proof" id="explore" aria-label="Atlas capabilities">
       <div><strong>Explore in 3D</strong><span>Rotate the model and inspect named structures.</span></div>
@@ -188,7 +188,7 @@ export default function AtlasStudio() {
         <button className={mode === 'explore' ? 'active' : ''} onClick={() => changeMode('explore')} aria-pressed={mode === 'explore'}><Layers3 size={16}/>Explore</button>
         <button className={mode === 'revise' ? 'active' : ''} onClick={() => changeMode('revise')} aria-pressed={mode === 'revise'}><BookOpen size={16}/>Revise</button>
       </nav>
-      <div className="header-right"><span className="reference-label"><i/>BodyParts3D reference</span><button className="icon-button" onClick={() => setAbout(true)} aria-label="Source and atlas information"><CircleHelp size={20}/></button></div>
+      <div className="header-right"><button className="icon-button" onClick={() => setAbout(true)} aria-label="Atlas information"><CircleHelp size={20}/></button></div>
     </header>
 
     <div className="workspace">
@@ -232,7 +232,6 @@ export default function AtlasStudio() {
         <div className="viewer-toolbar"><div><button className="icon-button mobile-only" onClick={() => setMobilePanel(true)} aria-label="Open anatomy library"><Menu size={18}/></button><span className="viewer-title">{scene.isolate ? 'Structure view' : scene.explode > .8 ? 'Anatomical inventory' : 'Whole-body view'}</span><span className="toolbar-divider"/><span className="viewer-subtitle">Adult male</span></div><span className="mesh-count">{visibleCount.toLocaleString()} visible</span></div>
         <div className="viewport" id="viewer" ref={viewport} tabIndex={-1}>
           {atlas && <AnatomyScene atlas={atlas} state={scene} onSelect={choosePart} onProgress={(value: number) => setProgress(value)} onError={(message: string) => setError(message)}/>}
-          <div className="viewport-label"><span className="viewport-cross">+</span><span>BODY PARTS / 3D REFERENCE</span><small>{scene.isolate ? 'ISOLATED' : 'ANATOMICAL POSITION'}</small></div>
           <div className="orientation" aria-hidden="true"><span>S</span><span>L</span><i/><span>R</span><span>I</span></div>
           <div className="camera-controls" aria-label="Camera controls">
             {(['three-quarter', 'front', 'side', 'back'] as View[]).map((view, index) => <button key={view} className={scene.view === view ? 'active' : ''} disabled={scene.explode > .8 && view !== 'front'} aria-pressed={scene.view === view} aria-label={`${view} view`} title={`${view} view`} onClick={() => setScene(current => ({ ...current, view, rotate: false, reset: current.reset + 1 }))}>{['¾', 'F', 'S', 'B'][index]}</button>)}
@@ -240,7 +239,7 @@ export default function AtlasStudio() {
             <button disabled={scene.explode >= .4 || scene.isolate} onClick={() => setScene(current => ({ ...current, rotate: !current.rotate }))} aria-label={scene.rotate ? 'Pause rotation' : 'Auto rotate'} title="Auto rotate">{scene.rotate ? <Pause size={16}/> : <RotateCw size={16}/>}</button>
             <button onClick={() => setScene(current => ({ ...current, reset: current.reset + 1 }))} aria-label="Fit model to view" title="Fit model"><Maximize2 size={15}/></button>
           </div>
-          {!error && progress < 100 && <div className="loading-state" role="status"><Activity size={28}/><h2>{atlas ? 'Preparing the anatomy' : 'Opening your atlas'}</h2><p>{atlas ? `${progress}% · Loading detailed geometry` : 'Connecting to the BodyParts3D catalogue'}</p><div className="loading-track"><i style={{ width: `${progress}%` }}/></div><small>First load includes about 33 MB of geometry.</small></div>}
+          {!error && progress < 100 && <div className="loading-state" role="status"><h2>{atlas ? 'Preparing the anatomy' : 'Opening your atlas'}</h2><p>{atlas ? <><strong>{progress}%</strong> · Loading detailed geometry</> : 'Loading the anatomy catalogue'}</p><div className="loading-track"><i style={{ width: `${progress}%` }}/></div><small>First load includes about 33 MB of geometry.</small></div>}
           {error && <div className="loading-state error-state" role="alert"><CircleHelp size={28}/><h2>Anatomy unavailable</h2><p>{error}</p><small>Check your connection. You can also run <code>npm run models:download</code> to install local model files.</small><button className="primary-button" onClick={() => { setQuiz(null); setChosen(null); setScene(INITIAL); setAttempt(current => current + 1); }}>Retry download<RotateCcw size={15}/></button></div>}
           {ready && !visibleCount && <div className="loading-state"><Layers3 size={28}/><h2>No layers visible</h2><p>Select a system from the anatomy library.</p><button className="primary-button" onClick={() => preset(DEFAULT_VISIBLE)}>Show anatomy<ArrowRight size={16}/></button></div>}
           <div className="model-caption">{!reveal ? 'IDENTIFICATION EXERCISE' : scene.isolate ? chosen?.name : scene.explode > .8 ? 'EVERY VISIBLE PIECE, SEPARATED' : 'EXPLORE THE BODY. UNDERSTAND THE CONNECTIONS.'}</div>

@@ -26,7 +26,7 @@ export default function AnatomyScene({ atlas, state, onSelect, onProgress, onErr
             return;
         }
         renderer.setPixelRatio(Math.min(devicePixelRatio, innerWidth < 768 ? 1.5 : 2));
-        renderer.setClearColor('#f5eedc');
+        renderer.setClearColor('#c8d3d8');
         renderer.outputColorSpace = T.SRGBColorSpace;
         renderer.toneMapping = T.ACESFilmicToneMapping;
         renderer.toneMappingExposure = .86;
@@ -46,18 +46,18 @@ export default function AnatomyScene({ atlas, state, onSelect, onProgress, onErr
         scene.environment = env.texture;
         room.dispose();
         pmrem.dispose();
-        scene.add(new T.HemisphereLight(0xffffff, 0x98856b, .72));
+        scene.add(new T.HemisphereLight(0xffffff, 0x8798a1, .72));
         const key = new T.DirectionalLight(0xfff6e8, 1.45);
         key.position.set(-2, 4, 3);
         scene.add(key);
         const rim = new T.DirectionalLight(0xd8e4f0, .72);
         rim.position.set(2, 2, -3);
         scene.add(rim);
-        const ground = new T.Mesh(new T.CircleGeometry(30, 96), new T.MeshStandardMaterial({ color: 0xe4dac6, roughness: 1 }));
+        const ground = new T.Mesh(new T.CircleGeometry(30, 96), new T.MeshStandardMaterial({ color: 0x81959e, roughness: 1, envMapIntensity: .15 }));
         ground.rotation.x = -Math.PI / 2;
         ground.position.y = -.019;
         scene.add(ground);
-        const platform = new T.Mesh(new T.CylinderGeometry(.68, .7, .028, 100), new T.MeshStandardMaterial({ color: 0xd8c9ad, metalness: .04, roughness: .8 }));
+        const platform = new T.Mesh(new T.CylinderGeometry(.68, .7, .028, 100), new T.MeshStandardMaterial({ color: 0x647e8a, metalness: .04, roughness: .8, envMapIntensity: .25 }));
         platform.position.y = -.016;
         scene.add(platform);
         const ring = new T.Mesh(new T.RingGeometry(.63, .632, 128), new T.MeshBasicMaterial({ color: 0x81745f, transparent: true, opacity: .45, side: T.DoubleSide }));
