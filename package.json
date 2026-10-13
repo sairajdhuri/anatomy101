@@ -1,0 +1,29 @@
+{
+  "name": "anatomy101",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --webpack --hostname 127.0.0.1",
+    "build": "next build --webpack",
+    "check": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "test:browser": "node tests/browser.mjs",
+    "models:download": "node scripts/download-models.mjs"
+  },
+  "dependencies": {
+    "next": "16.3.8",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "three": "0.186.1",
+    "lucide-react": "1.50.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@types/node": "22.20.5",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.3",
+    "playwright": "1.63.0"
+  },
+  "engines": { "node": ">=22.13.0" }
+}
