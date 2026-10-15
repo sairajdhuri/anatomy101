@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
 import { createQuiz, loadAtlas, searchConcepts, validateAtlas } from '../src/atlas/catalogue.ts';
-import { createExplosionLayout } from '../src/atlas/explosion-layout.ts';
+import { createExplosionLayout, stageHeight } from '../src/atlas/explosion-layout.ts';
 import { decodeModelResponse } from '../src/atlas/model-download.ts';
 import { PointerTap } from '../src/atlas/pointer-tap.ts';
 import { getStudyNote } from '../src/atlas/study-notes.ts';
@@ -16,6 +16,15 @@ const part = (id: string, name: string, system: Part['system'] = 'cardiac'): Par
 });
 const parts = [part('heart', 'heart'), part('valve', 'aortic valve'), part('atrium', 'left atrium'),
   part('ventricle', 'right ventricle'), part('brain', 'brain', 'nervous')];
+test('plate stays below separated feet and ignores hidden meshes', () => {
+  const foot = { ...part('foot', 'foot', 'skeletal'), bounds: [[0, 0, 0], [.1, .08, .2]] } as Part;
+  for (const displacement of [0, -.04, -.12, -.24]) {
+    const state = new Float32Array([0, displacement, 0, 1, 0, -10, 0, 0]);
+    const height = stageHeight([foot, foot], state);
+    assert.ok(height + .001 < displacement, 'plate and rings must clear the foot');
+    assert.ok(height > displacement - .01, 'hidden geometry must not lower the plate');
+  }
+});
 const atlas: Atlas = {
   version: 'test', parts, concepts: parts.map(p => ({ id: p.conceptId, name: p.name, elements: [p.id] })),
   chunks: [{ url: '/models/body-0.bin', bytes: 68 }], triangles: 5,

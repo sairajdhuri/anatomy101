@@ -1,5 +1,13 @@
 import type {Part} from './anatomy';
 export interface LayoutCell {x:number;y:number;width:number;height:number}
+/** Keep the display plate below every visible mesh, including during separation. */
+export function stageHeight(parts: Part[], state: Float32Array) {
+ let lowest = 0;
+ parts.forEach((part, i) => {
+  if (state[i * 4 + 3] > .5) lowest = Math.min(lowest, part.bounds[0][1] + state[i * 4 + 1]);
+ });
+ return lowest - .004;
+}
 /** Pack only visible source meshes. Every projected bounding box gets its own cell. */
 export function createExplosionLayout(parts:Part[],aspect=1){
  const cards=parts.map(p=>({id:p.id,system:p.system,width:Math.max(.035,p.bounds[1][0]-p.bounds[0][0])+.04,height:Math.max(.035,p.bounds[1][1]-p.bounds[0][1])+.04}));

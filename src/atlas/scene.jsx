@@ -4,7 +4,7 @@ import * as T from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { createExplosionLayout } from './explosion-layout';
+import { createExplosionLayout, stageHeight } from './explosion-layout';
 import { decodeModelResponse } from './model-download';
 import { PointerTap } from './pointer-tap';
 import { SYSTEMS } from './anatomy';
@@ -26,7 +26,7 @@ export default function AnatomyScene({ atlas, state, onSelect, onProgress, onErr
             return;
         }
         renderer.setPixelRatio(Math.min(devicePixelRatio, innerWidth < 768 ? 1.5 : 2));
-        renderer.setClearColor('#c8d3d8');
+        renderer.setClearColor('#9eB4c3');
         renderer.outputColorSpace = T.SRGBColorSpace;
         renderer.toneMapping = T.ACESFilmicToneMapping;
         renderer.toneMappingExposure = .86;
@@ -296,6 +296,10 @@ export default function AnatomyScene({ atlas, state, onSelect, onProgress, onErr
                         mesh.updateMatrixWorld(true);
                     }
                 });
+                const floor = stageHeight(atlas.parts, data);
+                ground.position.y = floor - .03;
+                platform.position.y = floor - .014;
+                ring.position.y = innerRing.position.y = floor + .001;
                 partTexture.needsUpdate = true;
                 selectionTexture.needsUpdate = true;
                 markerGeometry.attributes.position.needsUpdate = true;
