@@ -100,7 +100,7 @@ test('atlas uses local assets first, falls back to remote, and respects cancella
     calls.length = 0;
     globalThis.fetch = async input => {
       calls.push(String(input));
-      return calls.length === 1 ? new Response('', { status: 404 }) : new Response(JSON.stringify(atlas));
+      return calls.length <= 2 ? new Response('', { status: 404 }) : new Response(JSON.stringify(atlas));
     };
     const remote = await loadAtlas(new AbortController().signal);
     assert.equal(remote.remote, true);

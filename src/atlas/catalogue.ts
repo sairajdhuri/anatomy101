@@ -1,7 +1,7 @@
 import { SYSTEMS, type Atlas, type Concept, type Part, type SystemId } from './anatomy.ts';
 
 export const REMOTE_ASSETS = 'https://raw.githubusercontent.com/ashemag/human-atlas/main/public';
-export const MODEL_PATH = /^\/models\/body-\d+\.bin(?:\.gz)?$/;
+export const MODEL_PATH = /^\/models\/(?:body|female)-\d+(?:\.bin(?:\.gz)?|-[a-f0-9]{12}\.meshopt\.gz)$/;
 
 export function validateAtlas(value: unknown): Atlas {
   const atlas = value as Atlas;
@@ -13,6 +13,19 @@ export function validateAtlas(value: unknown): Atlas {
   for (const chunk of atlas.chunks) {
     if (!MODEL_PATH.test(chunk.url) || (chunk.gzip && !MODEL_PATH.test(chunk.gzip))
       || !integer(chunk.bytes) || !chunk.bytes) throw new Error('Invalid anatomy chunk.');
+    if (chunk.streams) {
+      let decoded = 0, encoded = 0;
+      if (!Array.isArray(chunk.streams) || !chunk.streams.length || !integer(chunk.packedBytes!) || !chunk.packedBytes
+        || !integer(chunk.downloadBytes!) || !chunk.downloadBytes) throw new Error('Invalid compressed anatomy.');
+      for (const stream of chunk.streams) {
+        if (!integer(stream.offset) || stream.offset !== decoded || !integer(stream.count) || !stream.count
+          || !integer(stream.stride) || !integer(stream.size) || !stream.size
+          || !['ATTRIBUTES', 'INDICES'].includes(stream.mode)
+          || (stream.mode === 'ATTRIBUTES' ? stream.stride < 4 || stream.stride > 256 || stream.stride % 4 : stream.stride !== 4)) throw new Error('Invalid compressed anatomy.');
+        decoded += stream.count * stream.stride; encoded += stream.size;
+      }
+      if (decoded !== chunk.bytes || encoded !== chunk.packedBytes) throw new Error('Invalid compressed anatomy.');
+    }
   }
   for (const part of atlas.parts) {
     const chunk = atlas.chunks[part.chunk];
@@ -34,14 +47,31 @@ export function validateAtlas(value: unknown): Atlas {
   return atlas;
 }
 
-export async function loadAtlas(signal: AbortSignal): Promise<{ atlas: Atlas; remote: boolean }> {
+export async function loadAtlas(signal: AbortSignal, sex: 'male' | 'female' = 'male'): Promise<{ atlas: Atlas; remote: boolean }> {
   let response: Response;
   try {
-    response = await fetch('/models/atlas.json', { signal });
+    // Prefer the system-based bundle; original catalogues remain a deployment fallback.
+    const compressed = typeof DecompressionStream !== 'undefined';
+    if (compressed && typeof WebAssembly !== 'undefined') {
+      response = await fetch(`/models/${sex === 'female' ? 'atlas-female' : 'atlas'}-fast.json.gz`, { signal });
+      if (response.ok) {
+        const payload = await response.arrayBuffer(), signature = new Uint8Array(payload, 0, Math.min(2, payload.byteLength));
+        const json = signature[0] === 0x1f && signature[1] === 0x8b
+          ? await new Response(new Blob([payload]).stream().pipeThrough(new DecompressionStream('gzip'))).json()
+          : JSON.parse(new TextDecoder().decode(payload));
+        const atlas = validateAtlas(json);
+        if (sex === 'female' && atlas.sex !== 'female') throw new Error('Incorrect female anatomy catalogue.');
+        return { atlas, remote: false };
+      }
+    }
+    response = await fetch(sex === 'female' ? '/models/atlas-female.json' : '/models/atlas.json', { signal });
     if (!response.ok) throw new Error('Local anatomy files unavailable.');
-    return { atlas: validateAtlas(await response.json()), remote: false };
+    const atlas = validateAtlas(await response.json());
+    if (sex === 'female' && atlas.sex !== 'female') throw new Error('Incorrect female anatomy catalogue.');
+    return { atlas, remote: false };
   } catch (error) {
     if (signal.aborted) throw error;
+    if (sex === 'female') throw new Error('The female reference files could not be loaded. Please retry or contact the site maintainer.');
   }
   response = await fetch(`${REMOTE_ASSETS}/models/atlas.json`, { signal });
   if (!response.ok) throw new Error('The anatomy catalogue could not be downloaded. Check your connection and retry.');

@@ -1,15 +1,10 @@
-@font-face {
-  font-family: "Frunchy Sage";
-  src: url("/fonts/frunchy-sage-regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-:root{--ink:#173657;--muted:#536b80;--accent:#174876;--accent-soft:#e6edf2;--line:#d9d0bc;--paper:#fffaf0;--stage:#f5eedc;--font:'Frunchy Sage',Georgia,'Times New Roman',serif;--ease-out:cubic-bezier(.22,1,.36,1)}
+@font-face{font-family:"Presque Elegante";src:url("/font/PresqueElegante.otf") format("opentype");font-weight:400;font-style:normal;font-display:swap;unicode-range:U+0000-002F,U+003A-10FFFF}
+:root{--ink:#173657;--muted:#536b80;--accent:#174876;--accent-soft:#e6edf2;--line:#d9d0bc;--paper:#fffaf0;--stage:#f5eedc;--font:var(--font-dm-sans),Arial,sans-serif;--ease-out:cubic-bezier(.22,1,.36,1)}
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%;font-family:var(--font);color:var(--ink);background:var(--stage)}
 body{font-size:13px}
-button,input,textarea{font:inherit}
+button,input,textarea,select{font:inherit}
+code,pre,kbd,samp{font-family:var(--font)}
 button,a,input,textarea{-webkit-tap-highlight-color:transparent}
 button{cursor:pointer;border:0;color:inherit;background:none}
 button:disabled{cursor:default;opacity:.4}
@@ -296,7 +291,7 @@ html{scroll-behavior:smooth;scroll-padding-top:84px}
 /* Carry the paper-and-ink identity into the study workspace. */
 .studio{background:#f5eedc}
 .app-header{background:#173d66;border-bottom:0}
-.studio-heart{width:42px;height:42px;object-fit:cover;mix-blend-mode:normal;background:#f5eedc;border-radius:50%}
+.studio-heart{width:42px;height:42px;object-fit:contain;mix-blend-mode:normal;background:transparent;border-radius:0}
 .brand-symbol{border-color:#9aacc0;color:#f0dfbc}
 .brand-light{color:#d8e0e8}
 .brand small,.reference-label{color:#d6e0e8}
@@ -376,3 +371,11 @@ html{scroll-behavior:smooth;scroll-padding-top:84px}
 @media(max-width:620px){.landing-header nav{gap:10px}.landing-header nav a{font-size:14px}.landing-nav-cta{padding:12px 10px}.landing-nav-cta svg{display:none}.landing-footer{flex-wrap:wrap;padding-block:24px}.landing-footer>span{display:block;order:3;flex-basis:100%;font-size:14px}.explode-dock{flex-wrap:wrap;gap:12px;padding:14px 18px}.explode-heading{flex:1}.explode-slider{order:3;flex-basis:100%}.camera-controls button{min-width:38px;min-height:38px}}
 @media(max-width:370px){.landing-header nav a:first-child{display:none}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.hero-poster{animation:none}.landing-primary:hover,.landing-nav-cta:hover,.system-entry:hover,.system-entry:hover img,.system-entry:hover>svg{transform:none}}
+
+.body-select{font:inherit;font-size:12px;color:inherit;background:transparent;border:1px solid #a89f8b;border-radius:4px;padding:6px;max-width:130px}
+.coverage-banner{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 16px;background:#fff3d8;color:#59451c;font-size:12px;flex-shrink:0}
+.coverage-banner button{text-decoration:underline;white-space:nowrap;color:inherit;font:inherit}
+.coverage-dialog li{margin:10px 0;line-height:1.5}.coverage-dialog .primary-button{margin-top:20px}
+@media(max-width:760px){.viewer-toolbar .viewer-title{display:none}.coverage-banner{font-size:11px}.body-select{font-size:11px}}
+
+.provenance-note{font-size:12px;line-height:1.6;background:#fff3d8;color:#59451c;padding:10px 12px;margin:12px 0}.provenance-note a{text-decoration:underline}

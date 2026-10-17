@@ -8,22 +8,29 @@
     "build": "next build --webpack",
     "check": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "test:browser:female": "node tests/browser-female.mjs",
+    "test:browser:streaming": "node tests/browser-streaming.mjs",
     "test:browser": "node tests/browser.mjs",
-    "models:download": "node scripts/download-models.mjs"
+    "models:female": "node --experimental-strip-types scripts/download-female.mjs",
+    "models:download": "node scripts/download-models.mjs",
+    "models:optimize": "node scripts/optimize-models.mjs"
   },
   "dependencies": {
+    "lucide-react": "1.50.0",
+    "meshoptimizer": "1.3.0",
     "next": "16.3.8",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "three": "0.186.1",
-    "lucide-react": "1.50.0"
+    "three": "0.186.1"
   },
   "devDependencies": {
-    "typescript": "5.9.3",
     "@types/node": "22.20.5",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.3",
-    "playwright": "1.63.0"
+    "playwright": "1.63.0",
+    "typescript": "5.9.3"
   },
-  "engines": { "node": ">=22.13.0" }
+  "engines": {
+    "node": ">=22.13.0"
+  }
 }

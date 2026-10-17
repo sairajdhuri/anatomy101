@@ -1,0 +1,57 @@
+import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
+import { chromium } from 'playwright';
+
+// Uses the bundled female geometry, with no intercepted model requests.
+const browser = await chromium.launch({ headless: true, args: ['--enable-unsafe-swiftshader'] });
+const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+page.setDefaultTimeout(60000);
+const errors = [];
+page.on('pageerror', error => errors.push(error.message));
+try {
+  await mkdir('artifacts', { recursive: true });
+  await page.goto(process.env.TEST_BASE_URL || 'http://127.0.0.1:3000');
+  await page.getByRole('button', { name: 'Start learning', exact: true }).first().click();
+  await page.getByRole('combobox', { name: 'Reference body' }).selectOption('female');
+  await page.getByRole('heading', { name: 'Female model: composite illustration' }).waitFor();
+  await page.screenshot({ path: 'artifacts/female-disclaimer.png' });
+  await page.getByRole('button', { name: 'Continue to female atlas' }).click();
+  await page.locator('.library-footer').filter({ hasText: '2,353 modeled structures' }).waitFor();
+  await page.locator('.loading-state').waitFor({ state: 'hidden', timeout: 120000 });
+  assert.equal(await page.locator('canvas').count(), 1);
+  assert.equal(await page.getByRole('button', { name: 'Hide breast anatomy', exact: true }).getAttribute('aria-pressed'), 'true');
+  await page.screenshot({ path: 'artifacts/female-reference.png' });
+  await page.getByRole('textbox', { name: 'Search anatomy' }).fill('female urethra');
+  await page.locator('.structure-list button').first().click();
+  assert.match(await page.locator('.provenance-note').innerText(), /Schematic/);
+  await page.getByRole('textbox', { name: 'Search anatomy' }).fill('uterus');
+  await page.locator('.structure-list button').first().click();
+  await page.getByRole('button', { name: 'Isolate structure', exact: true }).click();
+  await page.getByRole('button', { name: 'Save structure', exact: true }).click();
+  await page.getByRole('tab', { name: 'My notes', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Your revision notes' }).fill('Female reference test note');
+  assert.match(await page.locator('.provenance-note').innerText(), /Fitted female reference/);
+  const saved = await page.evaluate(() => localStorage.getItem('human-atlas-study-v1'));
+  assert.ok(saved.includes('Female reference test note'));
+  assert.ok(Object.keys(JSON.parse(saved).notes).every(id => id.startsWith('FAB:')));
+  await page.getByRole('button', { name: 'Reset', exact: true }).click();
+  await page.getByRole('button', { name: 'Revise', exact: true }).click();
+  await page.getByRole('button', { name: 'Start practice', exact: true }).click();
+  await page.getByRole('heading', { name: 'Which structure is this?' }).waitFor();
+  await page.locator('.quiz-choices button').first().click();
+  await page.getByRole('button', { name: 'Next structure', exact: true }).waitFor();
+  await page.getByRole('combobox', { name: 'Reference body' }).selectOption('male');
+  await page.getByRole('combobox', { name: 'Reference body' }).selectOption('female');
+  await page.getByRole('button', { name: 'Continue to female atlas' }).click();
+  await page.locator('.loading-state').waitFor({ state: 'hidden', timeout: 120000 });
+  await page.getByRole('tab', { name: /Saved/ }).click();
+  await page.locator('.structure-list button').first().click();
+  await page.getByRole('tab', { name: 'My notes', exact: true }).click();
+  assert.equal(await page.getByRole('textbox', { name: 'Your revision notes' }).inputValue(), 'Female reference test note');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: 'View limitations' }).click();
+  await page.screenshot({ path: 'artifacts/female-mobile.png', fullPage: true });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  assert.deepEqual(errors, []);
+  console.log('Real female model passed: geometry rendering, disclaimer, breast visibility and schematic labels, search, isolation, notes, bookmarks, quiz, switching, mobile.');
+} finally { await browser.close(); }

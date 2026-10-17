@@ -8,4 +8,11 @@ out/
 test-results/
 artifacts/
 debug.log
-public/models/
+public/models/*
+!public/models/atlas-female.json
+!public/models/female-*.bin
+!public/models/female-*.bin.gz
+!public/models/atlas-fast.json
+!public/models/atlas-female-fast.json
+!public/models/*-fast.json.gz
+!public/models/*.meshopt.gz

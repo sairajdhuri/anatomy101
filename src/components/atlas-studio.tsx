@@ -3,26 +3,33 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { ArrowRight, ArrowUpRight, Bookmark, BookOpen, Check, ChevronRight, CircleHelp,
-  Eye, EyeOff, Focus, Layers3, Maximize2, Menu, Pause, RotateCcw, RotateCw, Search, X } from 'lucide-react';
+  Eye, EyeOff, Focus, Layers3, Maximize2, Menu, Minimize2, Pause, RotateCcw, RotateCw, Search, X } from 'lucide-react';
 import { DEFAULT_VISIBLE, SYSTEMS, explanation, type Atlas, type Concept, type SceneState,
   type SystemId, type View } from '@/atlas/anatomy';
 import { createQuiz, loadAtlas, searchConcepts, type Quiz } from '@/atlas/catalogue';
 import { getStudyNote, STUDY_NOTES } from '@/atlas/study-notes';
+import AtlasLanding from './atlas-landing';
+import './atlas-workspace.css';
 
 const AnatomyScene = dynamic(() => import('@/atlas/scene'), { ssr: false });
-const ORGANS: SystemId[] = ['cardiac', 'respiratory', 'digestive', 'urinary', 'endocrine', 'reproductive', 'lymphatic'];
+const ORGANS: SystemId[] = ['breast', 'cardiac', 'respiratory', 'digestive', 'urinary', 'endocrine', 'reproductive', 'lymphatic'];
 const INITIAL: SceneState = {
-  explode: 0, visible: ['skeletal', 'cardiac', 'respiratory', 'digestive', 'urinary', 'nervous', 'arterial', 'venous'],
+  explode: 0, visible: ['skeletal', 'cardiac', 'respiratory', 'digestive', 'urinary'],
   selected: [], isolate: false, view: 'three-quarter', rotate: false, reset: 0,
 };
 const COMMON = ['heart', 'brain', 'liver', 'right lung', 'left kidney', 'stomach', 'pancreas', 'diaphragm'];
 const STORAGE_KEY = 'human-atlas-study-v1';
 
 export default function AtlasStudio() {
+  const [sex, setSex] = useState<'male' | 'female'>('male');
+  const [coverageOpen, setCoverageOpen] = useState(false);
+  const coverageDialog = useRef<HTMLDialogElement>(null);
   const [started, setStarted] = useState(false);
   const [atlas, setAtlas] = useState<Atlas | null>(null);
   const [scene, setScene] = useState<SceneState>(INITIAL);
   const [progress, setProgress] = useState(0);
+  const [loadInfo, setLoadInfo] = useState({ loaded: 0, total: 0, bytes: 0 });
+  const [focusMode, setFocusMode] = useState(false);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [remote, setRemote] = useState(false);
@@ -43,18 +50,26 @@ export default function AtlasStudio() {
   const search = useRef<HTMLInputElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const viewport = useRef<HTMLDivElement>(null);
+  const inspector = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const compact = matchMedia('(max-width: 1000px)');
+    const restorePanels = () => { if (compact.matches) setFocusMode(false); };
+    compact.addEventListener('change', restorePanels);
+    return () => compact.removeEventListener('change', restorePanels);
+  }, []);
 
   useEffect(() => {
     if (!started) return;
     const abort = new AbortController();
-    setProgress(0); setError(''); setAtlas(null);
-    loadAtlas(abort.signal).then(result => {
+    setProgress(0); setLoadInfo({ loaded: 0, total: 0, bytes: 0 }); setError(''); setAtlas(null);
+    loadAtlas(abort.signal, sex).then(result => {
       if (!abort.signal.aborted) { setAtlas(result.atlas); setRemote(result.remote); }
     }).catch(error => {
       if (!abort.signal.aborted) setError(error instanceof Error ? error.message : 'Could not load the anatomy.');
     });
     return () => abort.abort();
-  }, [attempt, started]);
+  }, [attempt, started, sex]);
 
   useEffect(() => {
     try {
@@ -77,9 +92,9 @@ export default function AtlasStudio() {
     const keyboard = (event: KeyboardEvent) => {
       if (event.key === '/' && !(event.target instanceof HTMLInputElement)
         && !(event.target instanceof HTMLTextAreaElement) && !(event.target as HTMLElement)?.isContentEditable) {
-        event.preventDefault(); setMobilePanel(true); search.current?.focus();
+        event.preventDefault(); setFocusMode(false); setMobilePanel(true); requestAnimationFrame(() => search.current?.focus());
       }
-      if (event.key === 'Escape') setMobilePanel(false);
+      if (event.key === 'Escape') { setMobilePanel(false); setFocusMode(false); }
     };
     window.addEventListener('keydown', keyboard);
     return () => window.removeEventListener('keydown', keyboard);
@@ -88,6 +103,20 @@ export default function AtlasStudio() {
   useEffect(() => {
     if (about) dialog.current?.showModal(); else dialog.current?.close();
   }, [about]);
+
+  useEffect(() => {
+    if (coverageOpen) coverageDialog.current?.showModal(); else coverageDialog.current?.close();
+  }, [coverageOpen]);
+
+  function switchBody(next: 'male' | 'female') {
+    if (next === sex) return;
+    setAtlas(null); setProgress(0); setLoadInfo({ loaded: 0, total: 0, bytes: 0 }); setError(''); setSex(next);
+    reset(); setQuery(''); setScore({ correct: 0, total: 0 });
+    setScene({ ...INITIAL, visible: next === 'female' ? [...INITIAL.visible, 'breast', 'reproductive'] : INITIAL.visible });
+    if (next === 'female') {
+      setCoverageOpen(true);
+    }
+  }
 
   const parts = useMemo(() => new Map(atlas?.parts.map(part => [part.id, part])), [atlas]);
   const counts = useMemo(() => Object.fromEntries(SYSTEMS.map(system =>
@@ -112,6 +141,7 @@ export default function AtlasStudio() {
     .find(concept => concept.name.toLowerCase() === name)).filter((concept): concept is Concept => !!concept);
 
   function choose(concept: Concept) {
+    setFocusMode(false);
     setChosen(concept); setDetailTab('overview'); setMobilePanel(false);
     setScene(current => ({ ...current, selected: concept.elements, isolate: false, rotate: false }));
   }
@@ -124,7 +154,7 @@ export default function AtlasStudio() {
 
   function reset() {
     setChosen(null); setQuiz(null); setAnswer(null); setMode('explore');
-    setScene(current => ({ ...INITIAL, reset: current.reset + 1 }));
+    setScene(current => ({ ...INITIAL, visible: sex === 'female' ? [...INITIAL.visible, 'breast', 'reproductive'] : INITIAL.visible, reset: current.reset + 1 }));
   }
 
   function preset(visible: SystemId[]) {
@@ -147,53 +177,45 @@ export default function AtlasStudio() {
   }
 
   function changeMode(next: 'explore' | 'revise') {
+    setFocusMode(false);
     setMode(next); setQuiz(null); setAnswer(null); setChosen(null);
     setScene(current => ({ ...current, selected: [], isolate: false, rotate: false }));
   }
 
-  function openAtlas(system?: SystemId) {
+  function openAtlas(system?: SystemId, body: 'male' | 'female' = 'male') {
+    void import('@/atlas/scene').catch(() => {});
+    setAtlas(null); setProgress(0); setLoadInfo({ loaded: 0, total: 0, bytes: 0 });
+    if (body !== sex) switchBody(body);
+    if (body === 'female') setCoverageOpen(true);
     if (system) setScene(current => ({ ...current, visible: [system], selected: [], isolate: false, explode: 0 }));
     setStarted(true);
     window.scrollTo(0, 0);
   }
 
-  if (!started) return <main className="landing">
-    <header className="landing-header">
-      <a className="landing-brand" href="#top" aria-label="Anatomy101 home"><img src="/heart.jpg" alt=""/><span>Anatomy<span>101</span></span></a>
-      <nav aria-label="Main navigation"><a href="#explore">Explore</a><a href="#systems">Systems</a><a href="#study">Study tools</a></nav>
-      <button className="landing-nav-cta" onClick={() => openAtlas()}>Start learning <ArrowRight size={16}/></button>
-    </header>
-    <section className="landing-hero" id="top">
-      <div className="hero-copy"><h1><span><i>Explore</i></span><span><i>anatomy</i></span></h1><p className="hero-deck">A detailed 3D atlas for medical study. Explore systems, separate structures, and build recall through hands-on revision.</p><div className="hero-actions"><button className="landing-primary" onClick={() => openAtlas()}>Start exploring <ArrowRight size={17}/></button><a className="landing-secondary" href="#systems">Browse systems</a></div><p className="hero-note">Rotate · isolate · inspect · revise</p></div>
-      <div className="hero-plates"><div className="hero-artwork"><img className="hero-poster" src="/hero.webp" width={1672} height={941} fetchPriority="high" alt="The Human Body, Anatomy101: engraved anatomical illustrations of the brain, torso, hand, and rib cage"/></div><button className="landing-primary hero-art-cta" onClick={() => openAtlas()}>Start exploring <ArrowRight size={17}/></button></div>
-    </section>
-    <section className="landing-proof" id="explore" aria-label="Atlas capabilities">
-      <div><strong>Explore in 3D</strong><span>Rotate the model and inspect named structures.</span></div>
-      <div><strong>Separate systems</strong><span>Show layers together or isolate one view.</span></div>
-      <div><strong>Revise actively</strong><span>Save structures, write notes, and test recall.</span></div>
-    </section>
-    <section className="systems-section" id="systems">
-      <div className="section-intro"><h2>Learn how the parts connect.</h2><span>Choose a layer to open the 3D atlas with that system in view.</span></div>
-      <div className="system-board">{SYSTEMS.map((item, index) => <button className="system-entry" key={item.id} onClick={() => openAtlas(item.id)}><span className="system-entry-art"><img loading="lazy" decoding="async" src={index % 3 === 0 ? '/skull.jpg' : index % 3 === 1 ? '/rib.jpg' : '/brain.jpg'} alt=""/></span><span className="system-entry-copy"><strong>{item.name}</strong><small>{item.description}</small></span><ArrowRight size={19}/></button>)}</div>
-    </section>
-    <section className="study-section" id="study"><div className="study-image"><img loading="lazy" decoding="async" src="/Anatomy101.jpg" alt="Anatomical reference plate with brain and hand illustrations"/></div><div className="study-copy"><h2>Make anatomy active.</h2><p>Click a structure to inspect it. Pull layers apart to see their relationships. Save important parts and return to them with your own notes and identification practice.</p><ol><li><span>Explore</span>Rotate and search the model.</li><li><span>Focus</span>Isolate structures or combine systems.</li><li><span>Remember</span>Bookmark, annotate, and quiz yourself.</li></ol><button className="landing-primary" onClick={() => openAtlas()}>Open the atlas <ArrowRight size={17}/></button></div></section>
-    <footer className="landing-footer"><a className="landing-brand" href="#top"><img src="/heart.jpg" alt=""/><span>Anatomy<span>101</span></span></a><span>Designed &amp; developed by Sai for J</span><a href="#top">Back to top ↑</a></footer>
-  </main>;
+  if (!started) return <AtlasLanding onOpen={openAtlas} onNavigate={destination => {
+    openAtlas();
+    if (destination === 'study') changeMode('revise');
+    if (destination === 'about') setAbout(true);
+    if (destination === 'systems' || destination === 'search') {
+      setTab(destination === 'search' ? 'structures' : 'systems');
+      setMobilePanel(true);
+    }
+  }}/>;
 
-  return <main className="studio" data-ui="">
+  return <main className={`studio${focusMode ? ' studio-focus' : ''}`} data-ui="">
     <a className="skip-link" href="#viewer">Skip to anatomy viewer</a>
     <header className="app-header">
-      <button className="brand" onClick={() => { setStarted(false); setMode('explore'); setQuiz(null); }} aria-label="Anatomy101 home"><img className="studio-heart" src="/heart.jpg" alt=""/><span>Anatomy<span className="brand-light">101</span><small>INTERACTIVE ATLAS</small></span></button>
+      <button className="brand" onClick={() => { setStarted(false); setMode('explore'); setQuiz(null); }} aria-label="Anatomy101 home"><img className="studio-heart" src="/heart.webp?v=2" alt=""/><span>Anatomy<span className="brand-light">101</span><small>INTERACTIVE ATLAS</small></span></button>
       <nav className="workspace-tabs" aria-label="Study mode">
         <button className={mode === 'explore' ? 'active' : ''} onClick={() => changeMode('explore')} aria-pressed={mode === 'explore'}><Layers3 size={16}/>Explore</button>
         <button className={mode === 'revise' ? 'active' : ''} onClick={() => changeMode('revise')} aria-pressed={mode === 'revise'}><BookOpen size={16}/>Revise</button>
       </nav>
-      <div className="header-right"><button className="icon-button" onClick={() => setAbout(true)} aria-label="Atlas information"><CircleHelp size={20}/></button></div>
+      <div className="header-right"><button className="focus-toggle" aria-pressed={focusMode} onClick={() => setFocusMode(current => !current)}>{focusMode ? <Minimize2 size={16}/> : <Maximize2 size={16}/>}<span>{focusMode ? 'Exit focus' : 'Focus view'}</span></button><button className="icon-button" onClick={() => setAbout(true)} aria-label="Atlas information"><CircleHelp size={20}/></button></div>
     </header>
 
     <div className="workspace">
       {mobilePanel && <button className="sidebar-backdrop" onClick={() => setMobilePanel(false)} aria-label="Close anatomy library"/>}
-      <aside className={`library ${mobilePanel ? 'mobile-open' : ''}`} aria-label="Anatomy library">
+      <aside className={`library ${mobilePanel ? 'mobile-open' : ''}`} aria-label="Anatomy library" inert={focusMode} aria-hidden={focusMode}>
         <div className="library-intro"><div><span className="section-label">YOUR REFERENCE</span><h1>Anatomy library</h1></div><button className="icon-button mobile-only" onClick={() => setMobilePanel(false)} aria-label="Close library"><X size={18}/></button></div>
         <label className="search-field"><Search size={16}/><input ref={search} value={query} onChange={event => { setQuery(event.target.value); setTab('structures'); }} placeholder="Find a structure…" aria-label="Search anatomy"/><kbd>/</kbd></label>
         <div className="library-tabs" role="tablist" aria-label="Library sections">
@@ -201,9 +223,9 @@ export default function AtlasStudio() {
         </div>
         <div className="library-content" id="library-content" role="tabpanel" aria-labelledby={`tab-${tab}`}>
           {tab === 'systems' && <>
-            <div className="presets" aria-label="Layer presets"><button onClick={() => preset(DEFAULT_VISIBLE)}>Full body</button><button onClick={() => preset(['skeletal'])}>Skeleton</button><button onClick={() => preset(ORGANS)}>Organs</button></div>
+            <div className="presets" aria-label="Layer presets"><button onClick={() => preset(DEFAULT_VISIBLE)}>{sex === 'female' ? 'All anatomy' : 'Full body'}</button><button onClick={() => preset(['skeletal'])}>Skeleton</button><button onClick={() => preset(ORGANS)}>Organs</button></div>
             <div className="list-heading"><span>ANATOMICAL SYSTEMS</span><button onClick={() => preset([])}>Hide all</button></div>
-            <div className="system-list">{SYSTEMS.map(item => <div className={`system-row ${scene.visible.includes(item.id) ? 'enabled' : ''}`} key={item.id}>
+            <div className="system-list">{SYSTEMS.filter(item => sex === 'female' || item.id !== 'breast').map(item => <div className={`system-row ${scene.visible.includes(item.id) ? 'enabled' : ''}`} key={item.id}>
               <button className="system-name" onClick={() => preset([item.id])} title={`Show only ${item.name.toLowerCase()}`}><span className="system-dot" style={{ background: item.color }}/><span>{item.name}</span><small>{atlas ? counts[item.id].toLocaleString() : '—'}</small></button>
               <button className="visibility-switch" aria-label={`${scene.visible.includes(item.id) ? 'Hide' : 'Show'} ${item.name.toLowerCase()}`} aria-pressed={scene.visible.includes(item.id)} onClick={() => {
                 setChosen(null); setQuiz(null); setAnswer(null);
@@ -211,7 +233,7 @@ export default function AtlasStudio() {
                   ? current.visible.filter(id => id !== item.id) : [...current.visible, item.id] }));
               }}>{scene.visible.includes(item.id) ? <Eye size={15}/> : <EyeOff size={15}/>}</button>
             </div>)}</div>
-            <p className="library-hint">Select a name to show one system. Use the eye to combine layers.</p>
+            <p className="library-hint">Select a name to focus on one system. Use the eye to combine layers.<span>Extra layers load when you need them.</span></p>
           </>}
           {tab === 'structures' && <>
             <div className="list-heading"><span>{query ? `${results.length.toLocaleString()} MATCHES` : 'START EXPLORING'}</span>{query && <button onClick={() => setQuery('')}>Clear</button>}</div>
@@ -229,9 +251,11 @@ export default function AtlasStudio() {
       </aside>
 
       <section className="viewer-panel" aria-label="Interactive anatomy">
-        <div className="viewer-toolbar"><div><button className="icon-button mobile-only" onClick={() => setMobilePanel(true)} aria-label="Open anatomy library"><Menu size={18}/></button><span className="viewer-title">{scene.isolate ? 'Structure view' : scene.explode > .8 ? 'Anatomical inventory' : 'Whole-body view'}</span><span className="toolbar-divider"/><span className="viewer-subtitle">Adult male</span></div><span className="mesh-count">{visibleCount.toLocaleString()} visible</span></div>
+        <div className="viewer-toolbar"><div><button className="icon-button mobile-only" onClick={() => setMobilePanel(true)} aria-label="Open anatomy library"><Menu size={18}/></button><span className="viewer-title">{scene.isolate ? 'Structure view' : scene.explode > .8 ? 'Anatomical inventory' : 'Anatomy in 3D'}</span><span className="toolbar-divider"/><select className="body-select" aria-label="Reference body" value={sex} onChange={event => switchBody(event.target.value as 'male' | 'female')}><option value="male">Adult male</option><option value="female">Female composite</option></select></div><span className="mesh-count"><i/>{visibleCount.toLocaleString()} visible</span></div>
+        {sex === 'female' && <div className="coverage-banner" role="status"><span>Composite illustration: adapted anatomy and schematic structures.</span><button onClick={() => setCoverageOpen(true)}>View limitations</button></div>}
         <div className="viewport" id="viewer" ref={viewport} tabIndex={-1}>
-          {atlas && <AnatomyScene atlas={atlas} state={scene} onSelect={choosePart} onProgress={(value: number) => setProgress(value)} onError={(message: string) => setError(message)}/>}
+          {atlas && <AnatomyScene atlas={atlas} state={{ ...scene, hideLabels: !reveal }} onSelect={choosePart} onProgress={(value: number, info: typeof loadInfo) => { setProgress(value); setLoadInfo(info); }} onError={(message: string) => setError(message)}/>}
+          <div className="stage-caption" aria-hidden="true"><span>ANATOMY / {sex === 'female' ? '02' : '01'}</span><strong>{scene.isolate && chosen && reveal ? chosen.name : scene.explode > .8 ? 'A different perspective.' : 'Beneath the surface.'}</strong></div>
           <div className="orientation" aria-hidden="true"><span>S</span><span>L</span><i/><span>R</span><span>I</span></div>
           <div className="camera-controls" aria-label="Camera controls">
             {(['three-quarter', 'front', 'side', 'back'] as View[]).map((view, index) => <button key={view} className={scene.view === view ? 'active' : ''} disabled={scene.explode > .8 && view !== 'front'} aria-pressed={scene.view === view} aria-label={`${view} view`} title={`${view} view`} onClick={() => setScene(current => ({ ...current, view, rotate: false, reset: current.reset + 1 }))}>{['¾', 'F', 'S', 'B'][index]}</button>)}
@@ -239,19 +263,20 @@ export default function AtlasStudio() {
             <button disabled={scene.explode >= .4 || scene.isolate} onClick={() => setScene(current => ({ ...current, rotate: !current.rotate }))} aria-label={scene.rotate ? 'Pause rotation' : 'Auto rotate'} title="Auto rotate">{scene.rotate ? <Pause size={16}/> : <RotateCw size={16}/>}</button>
             <button onClick={() => setScene(current => ({ ...current, reset: current.reset + 1 }))} aria-label="Fit model to view" title="Fit model"><Maximize2 size={15}/></button>
           </div>
-          {!error && progress < 100 && <div className="loading-state" role="status"><h2>{atlas ? 'Preparing the anatomy' : 'Opening your atlas'}</h2><p>{atlas ? <><strong>{progress}%</strong> · Loading detailed geometry</> : 'Loading the anatomy catalogue'}</p><div className="loading-track"><i style={{ width: `${progress}%` }}/></div><small>First load includes about 33 MB of geometry.</small></div>}
-          {error && <div className="loading-state error-state" role="alert"><CircleHelp size={28}/><h2>Anatomy unavailable</h2><p>{error}</p><small>Check your connection. You can also run <code>npm run models:download</code> to install local model files.</small><button className="primary-button" onClick={() => { setQuiz(null); setChosen(null); setScene(INITIAL); setAttempt(current => current + 1); }}>Retry download<RotateCcw size={15}/></button></div>}
+          {!error && progress < 100 && <div className={`loading-state${loadInfo.loaded ? ' is-streaming' : ''}`} role="status"><div className="loading-orbit" aria-hidden="true"><Focus size={28}/></div><h2>{loadInfo.loaded ? 'Adding your layers' : atlas ? 'Bringing anatomy into view' : 'Opening your atlas'}</h2><p>{atlas ? <><strong>{progress}%</strong> · {loadInfo.loaded ? 'You can already rotate and explore.' : 'Loading your visible systems first.'}</> : 'Loading the anatomy catalogue'}</p><div className="loading-track" role="progressbar" aria-label="Anatomy layers" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}><i style={{ width: `${progress}%` }}/></div><small>{loadInfo.bytes ? `${(loadInfo.bytes / 1_000_000).toFixed(1)} MB for these layers. Other systems load on demand.` : 'Complete anatomical detail, one layer at a time.'}</small></div>}
+          {error && <div className="loading-state error-state" role="alert"><CircleHelp size={28}/><h2>Anatomy unavailable</h2><p>{error}</p><small>Check your connection and try again. Your saved structures and notes are kept in this browser.</small><button className="primary-button" onClick={() => { reset(); setAttempt(current => current + 1); }}>Retry download<RotateCcw size={15}/></button></div>}
           {ready && !visibleCount && <div className="loading-state"><Layers3 size={28}/><h2>No layers visible</h2><p>Select a system from the anatomy library.</p><button className="primary-button" onClick={() => preset(DEFAULT_VISIBLE)}>Show anatomy<ArrowRight size={16}/></button></div>}
+          {chosen && reveal && <button className="selection-peek" onClick={() => inspector.current?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' })}><span><small>SELECTED STRUCTURE</small>{chosen.name}</span><span>View details <ArrowRight size={15}/></span></button>}
         </div>
         <div className="explode-dock">
           <div className="explode-heading"><Layers3 size={18}/><div><label htmlFor="explode">Separate anatomy</label><span>See how the pieces fit together</span></div></div>
-          <div className="explode-slider"><div><span>Assembled</span><output htmlFor="explode">{Math.round(scene.explode * 100)}%</output><span>Separated</span></div><input id="explode" type="range" min="0" max="100" step="1" value={scene.explode * 100} disabled={!!quiz && answer === null} onChange={event => { const amount = Number(event.target.value) / 100; setScene(current => ({ ...current, explode: amount, rotate: false, isolate: false, view: amount > .8 ? 'front' : current.view })); }}/></div>
+          <div className="explode-slider"><div className="explode-presets">{([['Assembled', 0], ['Layers', .45], ['Inventory', 1]] as const).map(([name, value]) => <button key={name} aria-pressed={Math.abs(scene.explode - value) < .01} disabled={!!quiz && answer === null} onClick={() => setScene(current => ({ ...current, explode: value, rotate: false, isolate: false, view: value > .8 ? 'front' : current.view }))}>{name}</button>)}<output htmlFor="explode">{Math.round(scene.explode * 100)}%</output></div><input id="explode" type="range" min="0" max="100" step="1" value={scene.explode * 100} disabled={!!quiz && answer === null} onChange={event => { const amount = Number(event.target.value) / 100; setScene(current => ({ ...current, explode: amount, rotate: false, isolate: false, view: amount > .8 ? 'front' : current.view })); }}/></div>
           <button className="reset-button" onClick={reset}><RotateCcw size={16}/><span>Reset</span></button>
         </div>
         <div className="viewer-footer"><span>Drag to {scene.explode > .8 ? 'pan' : 'rotate'}<b>·</b>Scroll to zoom<b>·</b>Click to inspect</span><span>Keyboard: ← → / + −</span></div>
       </section>
 
-      <aside className="inspector" aria-label="Structure information">
+      <aside className="inspector" aria-label="Structure information" ref={inspector} inert={focusMode} aria-hidden={focusMode}>
         <div className="inspector-heading"><span className="section-label">{mode === 'revise' ? 'ACTIVE RECALL' : 'STRUCTURE INSPECTOR'}</span><span className="inspector-number">{mode === 'revise' ? '02' : '01'}</span></div>
         {mode === 'revise' && <div className="revision-panel">
           <div className="revision-score"><BookOpen size={18}/><span>Identification practice</span><strong>{score.correct}/{score.total}</strong></div>
@@ -264,6 +289,7 @@ export default function AtlasStudio() {
         {chosen && reveal && selected ? <div className="detail-content">
           <div className="structure-system"><i style={{ background: system?.color }}/>{system?.name}</div>
           <div className="structure-heading"><h2>{chosen.name}</h2><button className={`icon-button bookmark-button ${saved.includes(chosen.id) ? 'saved' : ''}`} aria-label={saved.includes(chosen.id) ? 'Remove bookmark' : 'Save structure'} aria-pressed={saved.includes(chosen.id)} onClick={() => setSaved(current => current.includes(chosen.id) ? current.filter(id => id !== chosen.id) : [...current, chosen.id])}><Bookmark size={20} fill={saved.includes(chosen.id) ? 'currentColor' : 'none'}/></button></div>
+          {sex === 'female' && <p className="provenance-note">{(['adapted', 'female-reference', 'schematic'] as const).filter(kind => selectedParts.some(part => part.provenance === kind)).map(kind => ({ adapted: 'Adapted male reference', 'female-reference': 'Fitted female reference', schematic: 'Schematic ? approximate teaching geometry' }[kind])).join(' ? ')}. <a href="/FEMALE-BLAST-ATTRIBUTION.md" target="_blank" rel="noreferrer">Sources and modifications</a></p>}
           <div className="structure-metadata"><span>{chosen.id}</span><span>{selectedParts.length} {selectedParts.length === 1 ? 'mesh' : 'meshes'}</span></div>
           <div className="detail-tabs" role="tablist" aria-label="Structure details"><button role="tab" aria-selected={detailTab === 'overview'} onClick={() => setDetailTab('overview')}>Overview</button><button role="tab" aria-selected={detailTab === 'notes'} onClick={() => setDetailTab('notes')}>My notes{notes[chosen.id] && <i/>}</button></div>
           {detailTab === 'overview' ? <>
@@ -278,13 +304,22 @@ export default function AtlasStudio() {
       </aside>
     </div>
     {storageError && <div className="storage-notice" role="status">{storageError}<button className="icon-button" onClick={() => setStorageError('')} aria-label="Dismiss storage message"><X size={14}/></button></div>}
+    <dialog ref={coverageDialog} className="about-dialog coverage-dialog" aria-labelledby="female-coverage-title" onCancel={() => setCoverageOpen(false)} onClose={() => setCoverageOpen(false)}>
+      <h2 id="female-coverage-title">Female model: composite illustration</h2>
+      <p>This model from Female Anatomy Blast combines 2,195 reshaped male-reference meshes, 76 fitted female-reference meshes, and 82 authored schematic pieces. It is not a scan of a woman or a clinically validated female atlas.</p>
+      <ul><li>Body shape, muscle attachments, sex-specific skeletal features, and alignment between sources need specialist review.</li><li>Some genital structures, pelvic nerves and vessels, and other small structures are approximate teaching schematics, labeled in the inspector.</li><li>A complete skin envelope, fine neurovascular branches, complete lymphatic drainage, microscopic anatomy, and physiological variation are not represented.</li></ul>
+      <p>Use this illustration alongside established anatomy references for revision. Visual detail does not establish anatomical accuracy. Do not use it for diagnosis, surgical planning, or anatomical measurements.</p>
+      <a className="reference-link" href="https://github.com/ThaddeusMercy/female-anatomy-blast" target="_blank" rel="noreferrer">Female Anatomy Blast source<ArrowUpRight size={15}/></a>
+      <button className="primary-button" onClick={() => setCoverageOpen(false)}>Continue to female atlas</button>
+    </dialog>
     <dialog ref={dialog} className="about-dialog" onCancel={() => setAbout(false)} onClose={() => setAbout(false)}>
       <div className="dialog-header"><span className="section-label">ABOUT THIS ATLAS</span><button className="icon-button" onClick={() => setAbout(false)} aria-label="Close atlas information"><X size={20}/></button></div>
       <h2>Human anatomy, made explorable.</h2><p>Explore anatomical structures, review system relationships, and practice identification.</p>
-      <div className="source-stats"><span><strong>{atlas?.parts.length.toLocaleString() || '2,234'}</strong>individual meshes</span><span><strong>{atlas?.concepts.length.toLocaleString() || '3,432'}</strong>named concepts</span></div>
+      <div className="source-stats"><span><strong>{atlas?.parts.length.toLocaleString() || '0'}</strong>individual meshes</span><span><strong>{atlas?.concepts.length.toLocaleString() || '0'}</strong>named concepts</span></div>
       <h3>Study content</h3><p>Organ notes are brief educational summaries with linked references. Structures without authored notes show system context. This app is for learning and revision, not diagnosis or surgical planning.</p>
       <p className="muted">Geometry: {remote ? 'online model files' : 'local model files'}. Bookmarks and notes stay in this browser.</p>
-      <a className="reference-link" href="https://dbarchive.biosciencedbc.jp/en/bodyparts3d/download.html" target="_blank" rel="noreferrer">Original anatomy dataset<ArrowUpRight size={15}/></a>
+      <p>{sex === 'female' ? 'Female composite: Mercy Thaddeus / Female Anatomy Blast, adapted BodyParts3D and HRA geometry plus authored schematics, CC BY 4.0. Not clinically validated.' : 'Male geometry: BodyParts3D, Database Center for Life Science, CC BY 4.0.'}</p>
+      <a className="reference-link" href={sex === 'female' ? 'https://github.com/ThaddeusMercy/female-anatomy-blast' : 'https://dbarchive.biosciencedbc.jp/en/bodyparts3d/download.html'} target="_blank" rel="noreferrer">Original anatomy dataset<ArrowUpRight size={15}/></a>
     </dialog>
   </main>;
 }
