@@ -21,7 +21,7 @@ try {
   await cdp.send('Network.enable');
   await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 100, downloadThroughput: 500000, uploadThroughput: 125000 });
   const started = Date.now();
-  await page.getByRole('button', { name: 'Start learning', exact: true }).click();
+  await page.getByRole('link', { name: 'Start learning', exact: true }).click();
   await page.locator('.is-streaming').waitFor();
   const firstLayerMs = Date.now() - started;
   assert.match(await page.locator('.studio').evaluate(e => getComputedStyle(e).fontFamily), /DM Sans/);
@@ -36,7 +36,7 @@ try {
   assert.ok(initialBytes < 8_000_000);
   await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
 
-  await page.getByRole('button', { name: 'Anatomy101 home' }).hover();
+  await page.getByRole('link', { name: 'Anatomy101 home' }).hover();
   assert.equal(await page.locator('.brand').evaluate(e => getComputedStyle(e).backgroundColor), 'rgba(0, 0, 0, 0)');
   await page.getByRole('button', { name: 'Focus view', exact: true }).click();
   assert.equal(await page.locator('.library').evaluate(e => e.inert), true);
@@ -55,8 +55,8 @@ try {
   await page.waitForFunction(async expected => (await (await caches.open('anatomy-geometry-v1')).keys()).length >= expected, new Set([...opening, ...muscles]).size);
   requests.length = 0;
   await page.route('**/*.meshopt.gz', route => route.abort());
-  await page.getByRole('button', { name: 'Anatomy101 home' }).click();
-  await page.getByRole('button', { name: 'Start learning', exact: true }).click();
+  await page.getByRole('link', { name: 'Anatomy101 home' }).click();
+  await page.getByRole('link', { name: 'Start learning', exact: true }).click();
   await page.locator('.loading-state').waitFor({ state: 'hidden' });
   assert.deepEqual(requests, [], 'Cached geometry should not hit the network');
   await page.unroute('**/*.meshopt.gz');

@@ -11,7 +11,7 @@ page.on('pageerror', error => errors.push(error.message));
 try {
   await mkdir('artifacts', { recursive: true });
   await page.goto(process.env.TEST_BASE_URL || 'http://127.0.0.1:3000');
-  await page.getByRole('button', { name: 'Start learning', exact: true }).first().click();
+  await page.getByRole('link', { name: 'Start learning', exact: true }).first().click();
   await page.getByRole('combobox', { name: 'Reference body' }).selectOption('female');
   await page.getByRole('heading', { name: 'Female model: composite illustration' }).waitFor();
   await page.screenshot({ path: 'artifacts/female-disclaimer.png' });

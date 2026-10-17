@@ -1,14 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { ArrowRight, ArrowUpRight, Bookmark, BookOpen, Check, ChevronRight, CircleHelp,
   Eye, EyeOff, Focus, Layers3, Maximize2, Menu, Minimize2, Pause, RotateCcw, RotateCw, Search, X } from 'lucide-react';
 import { DEFAULT_VISIBLE, SYSTEMS, explanation, type Atlas, type Concept, type SceneState,
   type SystemId, type View } from '@/atlas/anatomy';
 import { createQuiz, loadAtlas, searchConcepts, type Quiz } from '@/atlas/catalogue';
 import { getStudyNote, STUDY_NOTES } from '@/atlas/study-notes';
-import AtlasLanding from './atlas-landing';
+import SkipLink from './skip-link';
 import './atlas-workspace.css';
 
 const AnatomyScene = dynamic(() => import('@/atlas/scene'), { ssr: false });
@@ -20,13 +22,35 @@ const INITIAL: SceneState = {
 const COMMON = ['heart', 'brain', 'liver', 'right lung', 'left kidney', 'stomach', 'pancreas', 'diaphragm'];
 const STORAGE_KEY = 'human-atlas-study-v1';
 
+function updateURL(changes: Record<string, string | null>) {
+  const url = new URL(window.location.href);
+  for (const [key, value] of Object.entries(changes)) {
+    if (value === null) url.searchParams.delete(key); else url.searchParams.set(key, value);
+  }
+  const href = url.pathname + url.search + url.hash;
+  if (href !== location.pathname + location.search + location.hash) window.history.replaceState(null, '', href);
+}
+
 export default function AtlasStudio() {
-  const [sex, setSex] = useState<'male' | 'female'>('male');
+  const params = useSearchParams();
+  const sex = params.get('body') === 'female' ? 'female' : 'male';
+  const mode = params.get('mode') === 'revise' ? 'revise' : 'explore';
+  const panel = params.get('panel');
+  const query = params.get('q') || '';
+  const tab = panel === 'structures' || panel === 'saved' ? panel : panel === 'systems' ? 'systems' : query ? 'structures' : 'systems';
+  const about = params.get('about') === '1';
+  const layers = params.get('systems');
+  const visibleFromURL = useMemo<SystemId[]>(() => {
+    const defaults: SystemId[] = sex === 'female' ? [...INITIAL.visible, 'breast', 'reproductive'] : INITIAL.visible;
+    if (layers === null) return defaults;
+    if (layers === '') return [];
+    const valid = layers.split(',').filter((id): id is SystemId => SYSTEMS.some(system => system.id === id));
+    return valid.length ? [...new Set(valid)] : defaults;
+  }, [layers, sex]);
   const [coverageOpen, setCoverageOpen] = useState(false);
   const coverageDialog = useRef<HTMLDialogElement>(null);
-  const [started, setStarted] = useState(false);
   const [atlas, setAtlas] = useState<Atlas | null>(null);
-  const [scene, setScene] = useState<SceneState>(INITIAL);
+  const [scene, setScene] = useState<SceneState>(() => ({ ...INITIAL, visible: visibleFromURL }));
   const [progress, setProgress] = useState(0);
   const [loadInfo, setLoadInfo] = useState({ loaded: 0, total: 0, bytes: 0 });
   const [focusMode, setFocusMode] = useState(false);
@@ -34,11 +58,7 @@ export default function AtlasStudio() {
   const [attempt, setAttempt] = useState(0);
   const [remote, setRemote] = useState(false);
   const [chosen, setChosen] = useState<Concept | null>(null);
-  const [tab, setTab] = useState<'systems' | 'structures' | 'saved'>('systems');
-  const [query, setQuery] = useState('');
-  const [mobilePanel, setMobilePanel] = useState(false);
-  const [about, setAbout] = useState(false);
-  const [mode, setMode] = useState<'explore' | 'revise'>('explore');
+  const [mobilePanel, setMobilePanel] = useState(!!panel || !!query);
   const [saved, setSaved] = useState<string[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [storageReady, setStorageReady] = useState(false);
@@ -52,6 +72,32 @@ export default function AtlasStudio() {
   const viewport = useRef<HTMLDivElement>(null);
   const inspector = useRef<HTMLElement>(null);
 
+  function setTab(value: 'systems' | 'structures' | 'saved') { updateURL({ panel: value }); }
+  function setQuery(value: string) { updateURL({ q: value || null }); }
+  function setAbout(value: boolean) { updateURL({ about: value ? '1' : null }); }
+
+  const focusSearch = useCallback(() => {
+    setFocusMode(false); setMobilePanel(true); updateURL({ panel: 'structures' });
+    requestAnimationFrame(() => search.current?.focus());
+  }, []);
+
+  useEffect(() => {
+    setChosen(null); setQuiz(null); setAnswer(null); setScore({ correct: 0, total: 0 });
+    setFocusMode(false); setCoverageOpen(sex === 'female');
+  }, [sex]);
+
+  useEffect(() => {
+    setChosen(null); setQuiz(null); setAnswer(null);
+    setScene(current => current.visible.join(',') === visibleFromURL.join(',') ? current
+      : { ...current, visible: visibleFromURL, selected: [], isolate: false, rotate: false });
+  }, [visibleFromURL]);
+
+  useEffect(() => {
+    if (!mobilePanel || tab !== 'structures' || about || coverageOpen) return;
+    const frame = requestAnimationFrame(() => search.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [mobilePanel, tab, about, coverageOpen]);
+
   useEffect(() => {
     const compact = matchMedia('(max-width: 1000px)');
     const restorePanels = () => { if (compact.matches) setFocusMode(false); };
@@ -60,8 +106,8 @@ export default function AtlasStudio() {
   }, []);
 
   useEffect(() => {
-    if (!started) return;
     const abort = new AbortController();
+    void import('@/atlas/scene').catch(() => {});
     setProgress(0); setLoadInfo({ loaded: 0, total: 0, bytes: 0 }); setError(''); setAtlas(null);
     loadAtlas(abort.signal, sex).then(result => {
       if (!abort.signal.aborted) { setAtlas(result.atlas); setRemote(result.remote); }
@@ -69,7 +115,7 @@ export default function AtlasStudio() {
       if (!abort.signal.aborted) setError(error instanceof Error ? error.message : 'Could not load the anatomy.');
     });
     return () => abort.abort();
-  }, [attempt, started, sex]);
+  }, [attempt, sex]);
 
   useEffect(() => {
     try {
@@ -90,15 +136,16 @@ export default function AtlasStudio() {
 
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || dialog.current?.open || coverageDialog.current?.open) return;
       if (event.key === '/' && !(event.target instanceof HTMLInputElement)
-        && !(event.target instanceof HTMLTextAreaElement) && !(event.target as HTMLElement)?.isContentEditable) {
-        event.preventDefault(); setFocusMode(false); setMobilePanel(true); requestAnimationFrame(() => search.current?.focus());
+        && !(event.target instanceof HTMLTextAreaElement) && !(event.target instanceof HTMLSelectElement) && !(event.target as HTMLElement)?.isContentEditable) {
+        event.preventDefault(); focusSearch();
       }
       if (event.key === 'Escape') { setMobilePanel(false); setFocusMode(false); }
     };
     window.addEventListener('keydown', keyboard);
     return () => window.removeEventListener('keydown', keyboard);
-  }, []);
+  }, [focusSearch]);
 
   useEffect(() => {
     if (about) dialog.current?.showModal(); else dialog.current?.close();
@@ -110,12 +157,9 @@ export default function AtlasStudio() {
 
   function switchBody(next: 'male' | 'female') {
     if (next === sex) return;
-    setAtlas(null); setProgress(0); setLoadInfo({ loaded: 0, total: 0, bytes: 0 }); setError(''); setSex(next);
-    reset(); setQuery(''); setScore({ correct: 0, total: 0 });
+    setAtlas(null); setProgress(0); setLoadInfo({ loaded: 0, total: 0, bytes: 0 }); setError('');
+    updateURL({ body: next === 'female' ? 'female' : null, mode: null, systems: null, q: null });
     setScene({ ...INITIAL, visible: next === 'female' ? [...INITIAL.visible, 'breast', 'reproductive'] : INITIAL.visible });
-    if (next === 'female') {
-      setCoverageOpen(true);
-    }
   }
 
   const parts = useMemo(() => new Map(atlas?.parts.map(part => [part.id, part])), [atlas]);
@@ -133,7 +177,7 @@ export default function AtlasStudio() {
   const note = chosen ? getStudyNote(chosen.name) : undefined;
   const visibleCount = atlas?.parts.filter(part => scene.isolate ? scene.selected.includes(part.id)
     : scene.visible.includes(part.system) || scene.selected.includes(part.id)).length || 0;
-  const ready = progress === 100 && !error;
+  const ready = !!atlas && progress === 100 && !error;
   const quizPoolSize = useMemo(() => new Set(atlas?.parts.filter(part => scene.visible.includes(part.system))
     .map(part => part.name)).size, [atlas, scene.visible]);
   const reveal = mode !== 'revise' || !quiz || answer !== null;
@@ -153,12 +197,13 @@ export default function AtlasStudio() {
   }
 
   function reset() {
-    setChosen(null); setQuiz(null); setAnswer(null); setMode('explore');
+    setChosen(null); setQuiz(null); setAnswer(null); updateURL({ mode: null, systems: null });
     setScene(current => ({ ...INITIAL, visible: sex === 'female' ? [...INITIAL.visible, 'breast', 'reproductive'] : INITIAL.visible, reset: current.reset + 1 }));
   }
 
   function preset(visible: SystemId[]) {
     setChosen(null); setQuiz(null); setAnswer(null);
+    updateURL({ systems: visible.join(',') });
     setScene(current => ({ ...current, visible, selected: [], isolate: false }));
   }
 
@@ -177,35 +222,15 @@ export default function AtlasStudio() {
   }
 
   function changeMode(next: 'explore' | 'revise') {
-    setFocusMode(false);
-    setMode(next); setQuiz(null); setAnswer(null); setChosen(null);
+    setFocusMode(false); setMobilePanel(false);
+    updateURL({ mode: next === 'revise' ? 'revise' : null }); setQuiz(null); setAnswer(null); setChosen(null);
     setScene(current => ({ ...current, selected: [], isolate: false, rotate: false }));
   }
 
-  function openAtlas(system?: SystemId, body: 'male' | 'female' = 'male') {
-    void import('@/atlas/scene').catch(() => {});
-    setAtlas(null); setProgress(0); setLoadInfo({ loaded: 0, total: 0, bytes: 0 });
-    if (body !== sex) switchBody(body);
-    if (body === 'female') setCoverageOpen(true);
-    if (system) setScene(current => ({ ...current, visible: [system], selected: [], isolate: false, explode: 0 }));
-    setStarted(true);
-    window.scrollTo(0, 0);
-  }
-
-  if (!started) return <AtlasLanding onOpen={openAtlas} onNavigate={destination => {
-    openAtlas();
-    if (destination === 'study') changeMode('revise');
-    if (destination === 'about') setAbout(true);
-    if (destination === 'systems' || destination === 'search') {
-      setTab(destination === 'search' ? 'structures' : 'systems');
-      setMobilePanel(true);
-    }
-  }}/>;
-
   return <main className={`studio${focusMode ? ' studio-focus' : ''}`} data-ui="">
-    <a className="skip-link" href="#viewer">Skip to anatomy viewer</a>
+    <SkipLink className="skip-link" target="viewer">Skip to anatomy viewer</SkipLink>
     <header className="app-header">
-      <button className="brand" onClick={() => { setStarted(false); setMode('explore'); setQuiz(null); }} aria-label="Anatomy101 home"><img className="studio-heart" src="/heart.webp?v=2" alt=""/><span>Anatomy<span className="brand-light">101</span><small>INTERACTIVE ATLAS</small></span></button>
+      <Link prefetch={false} className="brand" href="/" aria-label="Anatomy101 home"><img className="studio-heart" src="/heart.webp?v=2" alt=""/><span>Anatomy<span className="brand-light">101</span><small>INTERACTIVE ATLAS</small></span></Link>
       <nav className="workspace-tabs" aria-label="Study mode">
         <button className={mode === 'explore' ? 'active' : ''} onClick={() => changeMode('explore')} aria-pressed={mode === 'explore'}><Layers3 size={16}/>Explore</button>
         <button className={mode === 'revise' ? 'active' : ''} onClick={() => changeMode('revise')} aria-pressed={mode === 'revise'}><BookOpen size={16}/>Revise</button>
@@ -227,11 +252,8 @@ export default function AtlasStudio() {
             <div className="list-heading"><span>ANATOMICAL SYSTEMS</span><button onClick={() => preset([])}>Hide all</button></div>
             <div className="system-list">{SYSTEMS.filter(item => sex === 'female' || item.id !== 'breast').map(item => <div className={`system-row ${scene.visible.includes(item.id) ? 'enabled' : ''}`} key={item.id}>
               <button className="system-name" onClick={() => preset([item.id])} title={`Show only ${item.name.toLowerCase()}`}><span className="system-dot" style={{ background: item.color }}/><span>{item.name}</span><small>{atlas ? counts[item.id].toLocaleString() : '—'}</small></button>
-              <button className="visibility-switch" aria-label={`${scene.visible.includes(item.id) ? 'Hide' : 'Show'} ${item.name.toLowerCase()}`} aria-pressed={scene.visible.includes(item.id)} onClick={() => {
-                setChosen(null); setQuiz(null); setAnswer(null);
-                setScene(current => ({ ...current, selected: [], isolate: false, visible: current.visible.includes(item.id)
-                  ? current.visible.filter(id => id !== item.id) : [...current.visible, item.id] }));
-              }}>{scene.visible.includes(item.id) ? <Eye size={15}/> : <EyeOff size={15}/>}</button>
+              <button className="visibility-switch" aria-label={`${scene.visible.includes(item.id) ? 'Hide' : 'Show'} ${item.name.toLowerCase()}`} aria-pressed={scene.visible.includes(item.id)} onClick={() => preset(scene.visible.includes(item.id)
+                ? scene.visible.filter(id => id !== item.id) : [...scene.visible, item.id])}>{scene.visible.includes(item.id) ? <Eye size={15}/> : <EyeOff size={15}/>}</button>
             </div>)}</div>
             <p className="library-hint">Select a name to focus on one system. Use the eye to combine layers.<span>Extra layers load when you need them.</span></p>
           </>}
@@ -298,9 +320,9 @@ export default function AtlasStudio() {
             {selectedParts.length > 1 && <details className="mesh-members"><summary>Included structures <span>{selectedParts.length}</span></summary><div>{selectedParts.slice(0, 60).map(part => <button key={part.id} onClick={() => choosePart(part.id)}>{part.name}<ChevronRight size={13}/></button>)}{selectedParts.length > 60 && <small>{selectedParts.length - 60} more meshes. Search a smaller structure to inspect them.</small>}</div></details>}
           </> : <div className="personal-notes"><label htmlFor="study-note">Your revision notes</label><textarea id="study-note" placeholder="Add landmarks, relations, or a recall prompt…" value={notes[chosen.id] || ''} onChange={event => setNotes(current => ({ ...current, [chosen.id]: event.target.value }))}/><p>{storageError || 'Saved on this browser. Keep personal study notes here.'}</p></div>}
           <div className="detail-actions"><button className="primary-button" onClick={() => setScene(current => ({ ...current, isolate: !current.isolate, explode: 0, rotate: false }))}><Focus size={17}/>{scene.isolate ? 'Show surrounding anatomy' : 'Isolate structure'}<ArrowRight size={16}/></button><button className="text-button" onClick={() => { setChosen(null); setScene(current => ({ ...current, selected: [], isolate: false })); }}>Clear selection</button></div>
-        </div> : mode === 'explore' && <div className="inspector-empty"><div className="empty-icon"><Focus size={30} strokeWidth={1.2}/></div><h2>Every part has a story.</h2><p>Select a structure on the model, or find one in the library.</p><div className="interaction-guide"><span><span>01</span>Click to inspect</span><span><span>02</span>Isolate for a closer look</span><span><span>03</span>Save, study, and revise</span></div><button className="outline-button" onClick={() => { setTab('structures'); setMobilePanel(true); search.current?.focus(); }}><Search size={16}/>Find a structure<ArrowRight size={15}/></button></div>}
+        </div> : mode === 'explore' && <div className="inspector-empty"><div className="empty-icon"><Focus size={30} strokeWidth={1.2}/></div><h2>Every part has a story.</h2><p>Select a structure on the model, or find one in the library.</p><div className="interaction-guide"><span><span>01</span>Click to inspect</span><span><span>02</span>Isolate for a closer look</span><span><span>03</span>Save, study, and revise</span></div><button className="outline-button" onClick={focusSearch}><Search size={16}/>Find a structure<ArrowRight size={15}/></button></div>}
         {mode === 'explore' && !chosen && <div className="study-start"><span className="section-label">A GOOD PLACE TO START</span><div>{STUDY_NOTES.slice(0, 4).map(item => <button key={item.title} disabled={!atlas} onClick={() => { const concept = atlas?.concepts.find(concept => item.names.includes(concept.name.toLowerCase())); if (concept) choose(concept); }}><span>{item.title}</span><ChevronRight size={14}/></button>)}</div></div>}
-        <div className="inspector-footer"><span>Reference anatomy. Individual variation applies.</span><button onClick={() => setAbout(true)}>About this atlas<ArrowUpRight size={12}/></button><small className="creator-credit">Designed &amp; developed by Sai for J</small></div>
+        <div className="inspector-footer"><span>Reference anatomy. Individual variation applies.</span><button onClick={() => setAbout(true)}>About this atlas<ArrowUpRight size={12}/></button><small className="creator-credit"><span>Designed &amp;</span>{' '}<span>developed by</span>{' '}<span>Sai for J</span></small></div>
       </aside>
     </div>
     {storageError && <div className="storage-notice" role="status">{storageError}<button className="icon-button" onClick={() => setStorageError('')} aria-label="Dismiss storage message"><X size={14}/></button></div>}

@@ -13,6 +13,8 @@ npm run dev
 
 Open http://127.0.0.1:3000.
 
+The landing page is `/`; the interactive workspace is `/atlas/`. Navigation uses real links, so reload, Back, Forward and opening a new tab work normally. The atlas URL preserves the selected reference body, visible systems, study mode, library tab and search. Female-reference reloads show the coverage disclaimer again. Static exports include `atlas/index.html` so direct visits also work on static hosts.
+
 Both references are bundled locally as compressed, system-based geometry. The opening male view downloads about 7.2 MB of geometry; the female composite downloads about 9.5 MB. Hidden systems load on demand, and validated geometry is cached for return visits. The original catalogue and online male reference remain compatibility fallbacks. See [loading and interaction notes](docs/atlas-performance.md) for measurements, reproduction and deployment details.
 
 To install the complete anatomy assets locally:

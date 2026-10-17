@@ -41,7 +41,7 @@ try {
     assert.equal(await page.getByRole('heading', { level: 1 }).textContent(), 'Anatomy101');
     assert.equal(await page.getByRole('heading', { level: 1 }).isVisible(), true);
     assert.equal(await page.locator('img[src="/landingpage.webp"]').count(), 0);
-    assert.ok((await page.getByRole('button', { name: 'Start learning', exact: true }).innerText()).includes('Start learning'));
+    assert.ok((await page.getByRole('link', { name: 'Start learning', exact: true }).innerText()).includes('Start learning'));
     assert.ok(await page.locator('.cover-intro').evaluate(element => {
       const range = document.createRange(); range.selectNodeContents(element);
       const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
@@ -51,48 +51,90 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.getByRole('link', { name: 'Explore systems', exact: true }).hover();
+  assert.equal(await page.locator('.cover-secondary').evaluate(element => getComputedStyle(element).backgroundColor), 'rgba(0, 0, 0, 0)');
   assert.equal(await page.locator('.cover-art img').evaluate(element => getComputedStyle(element).animationName), 'none');
   await page.keyboard.press('Tab');
   assert.equal(await page.getByRole('link', { name: 'Skip to content' }).evaluate(element => element === document.activeElement), true);
   await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.activeElement === document.querySelector('#cover-main'));
   assert.equal(await page.locator('#cover-main').evaluate(element => element === document.activeElement), true);
-  await page.getByRole('button', { name: 'Explore nervous system', exact: true }).click();
+  await page.getByRole('link', { name: 'Explore nervous system', exact: true }).click();
+  await page.waitForURL(/\/atlas\//);
+  assert.equal(new URL(page.url()).pathname, '/atlas/');
   assert.equal(await page.getByRole('button', { name: 'Hide nervous system', exact: true }).getAttribute('aria-pressed'), 'true');
   assert.equal(await page.getByRole('button', { name: 'Show skeleton', exact: true }).getAttribute('aria-pressed'), 'false');
-  await page.getByRole('button', { name: 'Anatomy101 home' }).click();
+  await page.reload();
+  await page.locator('.studio').waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Hide nervous system', exact: true }).getAttribute('aria-pressed'), 'true');
+  await page.goBack();
+  await page.locator('.atlas-cover').waitFor();
+  await page.goForward();
+  await page.locator('.studio').waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Show skeleton', exact: true }).getAttribute('aria-pressed'), 'false');
+  await page.getByRole('link', { name: 'Skip to anatomy viewer', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.activeElement === document.querySelector('#viewer'));
+  assert.equal(new URL(page.url()).searchParams.get('systems'), 'nervous');
+  await page.getByRole('link', { name: 'Anatomy101 home' }).click();
+  await page.locator('.atlas-cover').waitFor();
+  await page.goBack();
+  await page.locator('.studio').waitFor();
+  assert.equal(new URL(page.url()).pathname, '/atlas/');
+  await page.getByRole('link', { name: 'Anatomy101 home' }).click();
 
   for (const [button, tab] of [['Search anatomy', 'Structures'], ['Explore systems', 'Systems']]) {
-    await page.getByRole('button', { name: button, exact: true }).click();
+    await page.getByRole('link', { name: button, exact: true }).click();
     assert.equal(await page.getByRole('tab', { name: tab, exact: true }).getAttribute('aria-selected'), 'true');
-    await page.getByRole('button', { name: 'Anatomy101 home' }).click();
+    await page.getByRole('link', { name: 'Anatomy101 home' }).click();
   }
-  await page.getByRole('button', { name: 'Study tools', exact: true }).click();
+  await page.getByRole('link', { name: 'Study tools', exact: true }).click();
   assert.equal(await page.getByRole('button', { name: 'Revise', exact: true }).getAttribute('aria-pressed'), 'true');
-  await page.getByRole('button', { name: 'Anatomy101 home' }).click();
-  await page.getByRole('button', { name: 'About', exact: true }).click();
+  await page.reload();
+  await page.getByRole('button', { name: 'Revise', exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Revise', exact: true }).getAttribute('aria-pressed'), 'true');
+  await page.getByRole('link', { name: 'Anatomy101 home' }).click();
+  await page.getByRole('link', { name: 'About', exact: true }).click();
+  await page.getByRole('dialog').waitFor();
   assert.equal(await page.locator('dialog').last().evaluate(element => element.open), true);
+  const aboutURL = page.url();
+  await page.keyboard.press('/');
+  assert.equal(page.url(), aboutURL, 'Search shortcuts must not change the page behind a modal');
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Anatomy101 home' }).click();
-  await page.getByRole('button', { name: 'Start learning', exact: true }).first().click();
+  await page.getByRole('link', { name: 'Anatomy101 home' }).click();
+  await page.getByRole('link', { name: 'Start learning', exact: true }).first().click();
   await page.getByLabel('Reference body').selectOption('female');
   await page.getByRole('heading', { name: 'Female model: composite illustration' }).waitFor();
   assert.equal(await page.getByLabel('Reference body').inputValue(), 'female');
   await page.getByRole('button', { name: 'Continue to female atlas' }).click();
-  await page.getByRole('button', { name: 'Anatomy101 home' }).click();
-  await page.getByRole('button', { name: 'Start learning', exact: true }).first().click();
+  await page.getByRole('link', { name: 'Anatomy101 home' }).click();
+  await page.getByRole('link', { name: 'Start learning', exact: true }).first().click();
   await page.getByLabel('Reference body').selectOption('female');
   await page.getByRole('heading', { name: 'Female model: composite illustration' }).waitFor();
   await page.reload({ waitUntil: 'networkidle' });
-  await page.getByRole('button', { name: 'Start learning', exact: true }).first().click();
+  assert.equal(new URL(page.url()).pathname, '/atlas/');
+  assert.equal(await page.getByLabel('Reference body').inputValue(), 'female');
+  await page.getByRole('button', { name: 'Continue to female atlas' }).click();
+  await page.getByLabel('Reference body').selectOption('male');
   await page.locator('canvas').waitFor();
-  await page.getByRole('heading', { name: 'Preparing the anatomy' }).waitFor({ state: 'hidden' });
+  await page.locator('.loading-state').waitFor({ state: 'hidden' });
   assert.equal(await page.locator('canvas').count(), 1);
   await page.getByRole('button', { name: 'Hide skeleton', exact: true }).click();
   assert.equal(await page.getByRole('button', { name: 'Show skeleton', exact: true }).getAttribute('aria-pressed'), 'false');
   await page.getByRole('button', { name: 'Show skeleton', exact: true }).click();
   await page.getByRole('button', { name: 'Full body', exact: true }).click();
+  await page.getByRole('button', { name: 'Hide muscles', exact: true }).click();
+  await page.reload();
+  await page.getByRole('button', { name: 'Show muscles', exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Show muscles', exact: true }).getAttribute('aria-pressed'), 'false');
+  await page.getByRole('button', { name: 'Hide all', exact: true }).click();
+  await page.reload();
+  await page.getByRole('heading', { name: 'No layers visible', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Show anatomy', exact: true }).click();
 
-  await page.getByRole('textbox', { name: 'Search anatomy' }).fill('heart');
+  await page.getByRole('textbox', { name: 'Search anatomy' }).fill('');
+  await page.getByRole('textbox', { name: 'Search anatomy' }).pressSequentially('heart', { delay: 30 });
+  assert.equal(await page.getByRole('textbox', { name: 'Search anatomy' }).inputValue(), 'heart');
   await page.locator('.structure-list button').first().click();
   await page.getByRole('heading', { name: 'heart', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Isolate structure', exact: true }).click();
@@ -101,8 +143,8 @@ try {
   await page.getByRole('tab', { name: 'My notes', exact: true }).click();
   await page.getByRole('textbox', { name: 'Your revision notes' }).fill('Review coronary dominance.');
   await page.reload({ waitUntil: 'networkidle' });
-  await page.getByRole('button', { name: 'Start learning', exact: true }).first().click();
-  await page.getByRole('heading', { name: 'Preparing the anatomy' }).waitFor({ state: 'hidden' });
+  await page.locator('.loading-state').waitFor({ state: 'hidden' });
+  assert.equal(await page.getByRole('textbox', { name: 'Search anatomy' }).inputValue(), 'heart');
   await page.getByRole('tab', { name: /Saved/ }).click();
   await page.locator('.structure-list button').first().click();
   assert.equal(await page.getByRole('button', { name: 'Remove bookmark' }).getAttribute('aria-pressed'), 'true');
@@ -152,7 +194,8 @@ try {
     assert.equal(overflow, false, `Horizontal overflow at ${width}px`);
   }
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole('button', { name: 'Open anatomy library' }).click();
+  await page.getByRole('button', { name: 'Find a structure', exact: true }).click();
+  await page.waitForFunction(() => document.activeElement === document.querySelector('input[aria-label="Search anatomy"]'));
   await page.getByRole('textbox', { name: 'Search anatomy' }).fill('brain');
   await page.locator('.structure-list button').first().click();
   await page.getByRole('heading', { name: 'brain', exact: true }).waitFor();
@@ -163,7 +206,7 @@ try {
   await page.getByRole('heading', { name: 'Female model: composite illustration' }).waitFor();
   await page.getByRole('button', { name: 'Continue to female atlas' }).click();
   await page.locator('.coverage-banner').waitFor();
-  await page.getByRole('heading', { name: 'Preparing the anatomy' }).waitFor({ state: 'hidden' });
+  await page.locator('.loading-state').waitFor({ state: 'hidden' });
   assert.equal(await page.locator('canvas').count(), 1);
   assert.equal(await page.getByRole('heading', { name: 'brain', exact: true }).count(), 0);
   await page.getByRole('button', { name: 'View limitations' }).click();
@@ -178,7 +221,6 @@ try {
 
   await page.evaluate(() => localStorage.setItem('human-atlas-study-v1', '{broken'));
   await page.reload({ waitUntil: 'networkidle' });
-  await page.getByRole('button', { name: 'Start learning', exact: true }).first().click();
   await page.locator('.storage-notice').waitFor();
   assert.equal(await page.evaluate(() => localStorage.getItem('human-atlas-study-v1')), '{broken');
 

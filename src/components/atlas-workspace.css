@@ -105,7 +105,8 @@
 .studio .study-start button:hover { padding-inline: 7px; color: var(--accent); background: #e9f1fa; }
 .studio .inspector-footer { padding: 18px 24px; background: #edf3f9; font-size: 10px; line-height: 1.7; }
 .studio .inspector-footer button { color: var(--accent); }
-.studio .creator-credit { font-size: 10px; font-weight: 500; }
+.studio .creator-credit { text-align: center; line-height: 1.5; letter-spacing: .02em; }
+.studio .creator-credit span { display: block; }
 .studio .detail-content, .studio .revision-panel { padding: 24px; animation: detail-arrive 300ms var(--ease-out) both; }
 .studio .structure-heading h2 { font-size: 28px; line-height: 1.2; letter-spacing: -.8px; }
 .studio .structure-system { color: var(--accent); font-size: 11px; }
