@@ -1,0 +1,22 @@
+.landing-intro:not([data-phase="ready"]) { height: 100svh; overflow: hidden; }
+.landing-intro[data-phase="loading"]>.landing-intro-content { visibility: hidden; opacity: 0; }
+.landing-intro-content { opacity: 1; transition: opacity 600ms cubic-bezier(.33, 1, .68, 1); }
+.landing-intro-screen { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; background: #f1ead8; color: #10212c; opacity: 1; transition: opacity 600ms cubic-bezier(.33, 1, .68, 1); }
+.landing-intro[data-phase="leaving"]>.landing-intro-screen { opacity: 0; }
+.landing-intro-heart { width: 100px; height: 136px; object-fit: contain; animation: anatomy-heartbeat 1.2s cubic-bezier(.45, 0, .55, 1) infinite; }
+.landing-intro-name { margin: 24px 0 14px; font: 48px/1.1 "Presque Elegante", Georgia, serif; letter-spacing: -.04em; }
+.landing-intro-trace { width: min(320px, 100%); height: 64px; overflow: hidden; color: #934238; }
+/* Opposite transforms keep the wave still while its clipping edge moves at a constant horizontal speed. */
+.landing-intro-trace-reveal { width: 100%; height: 100%; overflow: hidden; animation: anatomy-trace-reveal 2.2s linear both; }
+.landing-intro-trace svg { display: block; width: 100%; height: 100%; animation: anatomy-trace-counter 2.2s linear both; }
+.landing-intro-trace path { stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.landing-intro-caption { margin: 18px 0 0; font: 16px/1.5 var(--font-dm-sans), Arial, sans-serif; text-align: center; }
+@keyframes anatomy-heartbeat { 0%, 50%, 100% { transform: scale(1); } 16% { transform: scale(1.045); } 26% { transform: scale(1.01); } 36% { transform: scale(1.03); } }
+@keyframes anatomy-trace-reveal { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@keyframes anatomy-trace-counter { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .landing-intro-screen, .landing-intro-content { transition: none; }
+  .landing-intro[data-phase="leaving"]>.landing-intro-screen { opacity: 1; }
+  .landing-intro[data-phase="leaving"]>.landing-intro-content { visibility: hidden; opacity: 0; }
+  .landing-intro-heart, .landing-intro-trace-reveal, .landing-intro-trace svg { animation: none; }
+}

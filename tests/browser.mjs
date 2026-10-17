@@ -35,6 +35,7 @@ await mkdir('artifacts', { recursive: true });
 
 try {
   await page.goto(process.env.TEST_BASE_URL || 'http://127.0.0.1:3000', { waitUntil: 'networkidle' });
+  await page.getByRole('heading', { level: 1 }).waitFor({ state: 'visible' });
   for (const width of [1440, 768, 390, 320]) {
     await page.setViewportSize({ width, height: 900 });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Landing overflows at ${width}px`);
