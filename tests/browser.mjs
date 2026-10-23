@@ -35,6 +35,7 @@ await mkdir('artifacts', { recursive: true });
 
 try {
   await page.goto(process.env.TEST_BASE_URL || 'http://127.0.0.1:3000', { waitUntil: 'networkidle' });
+  await page.waitForFunction(() => document.querySelector('.landing-intro')?.dataset.phase === 'ready');
   await page.getByRole('heading', { level: 1 }).waitFor({ state: 'visible' });
   for (const width of [1440, 768, 390, 320]) {
     await page.setViewportSize({ width, height: 900 });
