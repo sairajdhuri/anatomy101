@@ -230,7 +230,7 @@ export default function AtlasStudio() {
   return <main className={`studio${focusMode ? ' studio-focus' : ''}`} data-ui="">
     <SkipLink className="skip-link" target="viewer">Skip to anatomy viewer</SkipLink>
     <header className="app-header">
-      <Link prefetch={false} className="brand" href="/" aria-label="Anatomy101 home"><img className="studio-heart" src="/heart.webp?v=2" alt=""/><span>Anatomy<span className="brand-light">101</span><small>INTERACTIVE ATLAS</small></span></Link>
+      <Link prefetch={false} className="brand" href="/" aria-label="Anatomy101 home"><img className="studio-heart" src="/heart-100.webp" srcSet="/heart.webp 732w" sizes="35px" alt="" decoding="async"/><span>Anatomy<span className="brand-light">101</span><small>INTERACTIVE ATLAS</small></span></Link>
       <nav className="workspace-tabs" aria-label="Study mode">
         <button className={mode === 'explore' ? 'active' : ''} onClick={() => changeMode('explore')} aria-pressed={mode === 'explore'}><Layers3 size={16}/>Explore</button>
         <button className={mode === 'revise' ? 'active' : ''} onClick={() => changeMode('revise')} aria-pressed={mode === 'revise'}><BookOpen size={16}/>Revise</button>

@@ -17,7 +17,7 @@ export default function AtlasLanding() {
     <SkipLink className="cover-skip" target="cover-main">Skip to content</SkipLink>
     <header className="cover-header">
       <a className="cover-brand" href="/" aria-label="Anatomy101 home" translate="no">
-        <img src="/heart.webp?v=2" width="34" height="46" alt=""/>
+        <img src="/heart-100.webp" srcSet="/heart.webp 732w" sizes="34px" width="34" height="46" alt="" decoding="async"/>
         <span>Anatomy<span>101</span></span>
       </a>
       <nav aria-label="Main navigation">
@@ -39,12 +39,12 @@ export default function AtlasLanding() {
           <ul className="cover-facts" aria-label="Atlas features"><li>Free to explore</li><li>Male &amp; female composite models</li><li>Notes, bookmarks &amp; quizzes</li></ul>
         </div>
         <figure className="cover-art">
-          <img src="/landing-illustration.webp" width="1254" height="1254" fetchPriority="high" alt=""/>
+          <img src="/landing-illustration-1200.webp" srcSet="/landing-illustration.webp 1254w" sizes="(max-width: 620px) 100vw, (max-width: 760px) 620px, (max-width: 960px) 720px, (max-width: 1100px) 52vw, (min-width: 1920px) 1037px, 54vw" width="1254" height="1254" fetchPriority="high" alt=""/>
         </figure>
       </section>
       <nav className="cover-system-index" aria-label="Anatomy systems">
         {STARTING_SYSTEMS.map(system => <Link prefetch={false} key={system.id} href={`/atlas/?systems=${system.id}`} aria-label={`Explore ${system.name.toLowerCase()} system`}>
-          <img className="cover-system-art" src={`/system-illustrations/${system.id}.webp`} width="60" height="70" alt=""/>
+          <img className="cover-system-art" src={`/system-illustrations/${system.id}.webp`} width="60" height="70" loading="lazy" decoding="async" alt=""/>
           <span><strong>{system.name}</strong><small>{system.detail}</small></span>
           <ArrowRight size={20} aria-hidden="true"/>
         </Link>)}

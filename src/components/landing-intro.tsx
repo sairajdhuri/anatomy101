@@ -17,7 +17,7 @@ export default function LandingIntro({ children }: { children: ReactNode }) {
 
   return <div className="landing-intro" data-phase={phase}>
     {phase !== 'ready' && <div className="landing-intro-screen" role="status" aria-label="Opening your anatomy atlas">
-      <img className="landing-intro-heart" src="/heart.webp?v=2" width="100" height="136" alt=""/>
+      <img className="landing-intro-heart" src="/heart-300.webp" srcSet="/heart.webp 732w" sizes="100px" width="100" height="136" alt="" decoding="async"/>
       <p className="landing-intro-name" translate="no">Anatomy101</p>
       <div className="landing-intro-trace" aria-hidden="true"><div className="landing-intro-trace-reveal">
         <svg viewBox="0 0 320 64" fill="none">
